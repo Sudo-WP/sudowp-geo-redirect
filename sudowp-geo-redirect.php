@@ -293,8 +293,10 @@ final class SudoWP_Geo_Redirect {
 
 		// Handle V1 IDs
 		if ( ! empty( $options['ids'] ) ) {
-			$ids = explode( ',', preg_replace( '/\s+/', '', $options['ids'] ) );
+			$ids = explode( ',', $options['ids'] );
 			foreach ( array_filter( $ids ) as $id ) {
+				$id = trim( $id );
+				
 				// Security: Strict validation - only positive integers
 				if ( ! ctype_digit( $id ) || (int) $id <= 0 ) {
 					continue;
@@ -323,19 +325,24 @@ final class SudoWP_Geo_Redirect {
 
 		// Handle V2 IDs
 		if ( ! empty( $options['v2_ids'] ) ) {
-			$ids_v2 = explode( ',', preg_replace( '/\s+/', '', $options['v2_ids'] ) );
+			$ids_v2 = explode( ',', $options['v2_ids'] );
 			
 			// Secure Referrer Handling
-			// Security: Validate and sanitize referrer with fallback for FastCGI/PHP-FPM
-			$referer = filter_var( $_SERVER['HTTP_REFERER'] ?? '', FILTER_VALIDATE_URL );
-			if ( false === $referer || empty( $referer ) ) {
-				$referer = '';
-			} else {
-				// Additional sanitization for WordPress
-				$referer = esc_url_raw( $referer );
+			// Security: Use filter_input for safer access, with fallback for FastCGI/PHP-FPM
+			$referer = filter_input( INPUT_SERVER, 'HTTP_REFERER', FILTER_VALIDATE_URL );
+			if ( false === $referer || null === $referer ) {
+				// Fallback for FastCGI/PHP-FPM environments where filter_input may not work
+				$referer = filter_var( $_SERVER['HTTP_REFERER'] ?? '', FILTER_VALIDATE_URL );
+				if ( false === $referer ) {
+					$referer = '';
+				}
 			}
+			// Additional WordPress sanitization
+			$referer = $referer ? esc_url_raw( $referer ) : '';
 
 			foreach ( array_filter( $ids_v2 ) as $id ) {
+				$id = trim( $id );
+				
 				// Security: Strict validation - only positive integers
 				if ( ! ctype_digit( $id ) || (int) $id <= 0 ) {
 					continue;
