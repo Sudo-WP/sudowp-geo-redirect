@@ -236,7 +236,8 @@ final class SudoWP_Geo_Redirect {
 		}
 
 		// Security: Check if settings were updated
-		if ( isset( $_GET['settings-updated'] ) ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- WordPress handles this via options.php
+		if ( filter_input( INPUT_GET, 'settings-updated', FILTER_VALIDATE_BOOLEAN ) ) {
 			add_settings_error(
 				self::OPTION_KEY,
 				'settings_updated',
@@ -254,10 +255,19 @@ final class SudoWP_Geo_Redirect {
 				<p>
 					<strong><?php esc_html_e( 'Getting Started:', 'sudowp-geo-redirect' ); ?></strong> 
 					<?php
-					printf(
-						/* translators: %s: URL to Geolify.com */
-						esc_html__( 'Create your redirects at %s and paste the IDs below.', 'sudowp-geo-redirect' ),
-						'<a href="https://geolify.com" target="_blank" rel="noopener noreferrer">Geolify.com</a>'
+					echo wp_kses(
+						sprintf(
+							/* translators: %s: URL to Geolify.com */
+							__( 'Create your redirects at %s and paste the IDs below.', 'sudowp-geo-redirect' ),
+							'<a href="https://geolify.com" target="_blank" rel="noopener noreferrer">Geolify.com</a>'
+						),
+						array(
+							'a' => array(
+								'href'   => array(),
+								'target' => array(),
+								'rel'    => array(),
+							),
+						)
 					);
 					?>
 				</p>
@@ -319,15 +329,13 @@ final class SudoWP_Geo_Redirect {
 			$ids_v2 = explode( ',', preg_replace( '/\s+/', '', $options['v2_ids'] ) );
 			
 			// Secure Referrer Handling
-			$referer = '';
-			if ( isset( $_SERVER['HTTP_REFERER'] ) && is_string( $_SERVER['HTTP_REFERER'] ) ) {
-				// Security: Validate and sanitize referrer
-				$referer = filter_var( $_SERVER['HTTP_REFERER'], FILTER_VALIDATE_URL );
-				if ( false !== $referer ) {
-					$referer = esc_url_raw( $referer );
-				} else {
-					$referer = '';
-				}
+			// Security: Use filter_input for safer superglobal access
+			$referer = filter_input( INPUT_SERVER, 'HTTP_REFERER', FILTER_VALIDATE_URL );
+			if ( false === $referer || null === $referer ) {
+				$referer = '';
+			} else {
+				// Additional sanitization for WordPress
+				$referer = esc_url_raw( $referer );
 			}
 
 			foreach ( array_filter( $ids_v2 ) as $id ) {
