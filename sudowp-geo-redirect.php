@@ -180,7 +180,7 @@ final class SudoWP_Geo_Redirect {
 			}
 
 			// Security: Strict validation - only numeric IDs allowed
-			if ( ctype_digit( $id ) && (int) $id > 0 && (int) $id <= PHP_INT_MAX ) {
+			if ( ctype_digit( $id ) && (int) $id > 0 ) {
 				$valid_ids[] = $id;
 			} else {
 				$invalid_ids[] = $id;
@@ -257,7 +257,7 @@ final class SudoWP_Geo_Redirect {
 					printf(
 						/* translators: %s: URL to Geolify.com */
 						esc_html__( 'Create your redirects at %s and paste the IDs below.', 'sudowp-geo-redirect' ),
-						'<a href="' . esc_url( 'https://geolify.com' ) . '" target="_blank" rel="noopener noreferrer">Geolify.com</a>'
+						'<a href="https://geolify.com" target="_blank" rel="noopener noreferrer">Geolify.com</a>'
 					);
 					?>
 				</p>
@@ -296,9 +296,14 @@ final class SudoWP_Geo_Redirect {
 				// Security: Sanitize ID for use in URL
 				$safe_id = absint( $id );
 				
+				$script_url = add_query_arg(
+					array( 'id' => $safe_id ),
+					'https://www.geolify.com/georedirect.php'
+				);
+				
 				wp_enqueue_script(
 					'sudowp-geo-' . $safe_id,
-					esc_url( 'https://www.geolify.com/georedirect.php?id=' . $safe_id ),
+					esc_url( $script_url ),
 					array(),
 					null,
 					array(
