@@ -72,7 +72,15 @@ final class SudoWP_Geo_Redirect {
 	 * Initialize Settings
 	 */
 	public function settings_init(): void {
-		register_setting( 'sudowp_geo_redirect_group', self::OPTION_KEY, array( $this, 'sanitize_settings' ) );
+		register_setting(
+			'sudowp_geo_redirect_group',
+			self::OPTION_KEY,
+			array(
+				'type'              => 'array',
+				'sanitize_callback' => array( $this, 'sanitize_settings' ),
+				'default'           => array(),
+			)
+		);
 
 		add_settings_section(
 			'sudowp_geo_section',
@@ -102,22 +110,110 @@ final class SudoWP_Geo_Redirect {
 
 	/**
 	 * Sanitize input settings
+	 *
+	 * @param array $input Raw input data from form submission.
+	 * @return array Sanitized settings.
 	 */
-	public function sanitize_settings( array $input ): array {
+	public function sanitize_settings( $input ): array {
+		// Security: Verify user has permission to save settings
+		if ( ! current_user_can( 'manage_options' ) ) {
+			add_settings_error(
+				self::OPTION_KEY,
+				'permission_denied',
+				__( 'You do not have permission to modify these settings.', 'sudowp-geo-redirect' ),
+				'error'
+			);
+			return get_option( self::OPTION_KEY, array() );
+		}
+
+		// Ensure input is an array
+		if ( ! is_array( $input ) ) {
+			$input = array();
+		}
+
 		$sanitized = array();
-		$sanitized['ids'] = isset( $input['ids'] ) ? sanitize_text_field( $input['ids'] ) : '';
-		$sanitized['v2_ids'] = isset( $input['v2_ids'] ) ? sanitize_text_field( $input['v2_ids'] ) : '';
+
+		// Sanitize and validate V1 IDs
+		if ( isset( $input['ids'] ) ) {
+			$sanitized['ids'] = $this->sanitize_id_list( $input['ids'], 'ids' );
+		} else {
+			$sanitized['ids'] = '';
+		}
+
+		// Sanitize and validate V2 IDs
+		if ( isset( $input['v2_ids'] ) ) {
+			$sanitized['v2_ids'] = $this->sanitize_id_list( $input['v2_ids'], 'v2_ids' );
+		} else {
+			$sanitized['v2_ids'] = '';
+		}
+
 		return $sanitized;
+	}
+
+	/**
+	 * Sanitize and validate a comma-separated list of IDs
+	 *
+	 * @param string $id_list Raw ID list string.
+	 * @param string $field_key Field key for error messages.
+	 * @return string Sanitized ID list.
+	 */
+	private function sanitize_id_list( string $id_list, string $field_key ): string {
+		// First sanitize the text
+		$id_list = sanitize_text_field( $id_list );
+		
+		// Remove all whitespace
+		$id_list = preg_replace( '/\s+/', '', $id_list );
+		
+		if ( empty( $id_list ) ) {
+			return '';
+		}
+
+		// Split by comma and validate each ID
+		$ids = explode( ',', $id_list );
+		$valid_ids = array();
+		$invalid_ids = array();
+
+		foreach ( $ids as $id ) {
+			$id = trim( $id );
+			if ( empty( $id ) ) {
+				continue;
+			}
+
+			// Security: Strict validation - only numeric IDs allowed
+			if ( ctype_digit( $id ) && (int) $id > 0 && (int) $id <= PHP_INT_MAX ) {
+				$valid_ids[] = $id;
+			} else {
+				$invalid_ids[] = $id;
+			}
+		}
+
+		// Report invalid IDs to user
+		if ( ! empty( $invalid_ids ) ) {
+			add_settings_error(
+				self::OPTION_KEY,
+				'invalid_' . $field_key,
+				sprintf(
+					/* translators: %s: comma-separated list of invalid IDs */
+					__( 'Invalid IDs removed (%s): Only positive numeric values are allowed.', 'sudowp-geo-redirect' ),
+					esc_html( implode( ', ', $invalid_ids ) )
+				),
+				'warning'
+			);
+		}
+
+		return implode( ',', $valid_ids );
 	}
 
 	/**
 	 * Render Input Fields
 	 */
 	public function render_field_ids( array $args ): void {
-		$options = get_option( self::OPTION_KEY );
+		$options = get_option( self::OPTION_KEY, array() );
 		$value   = isset( $options[ $args['key'] ] ) ? $options[ $args['key'] ] : '';
+		$field_id = $args['label_for'] ?? '';
 		?>
 		<input type='text' 
+			   id='<?php echo esc_attr( $field_id ); ?>'
 			   name='<?php echo esc_attr( self::OPTION_KEY . '[' . $args['key'] . ']' ); ?>' 
 			   value='<?php echo esc_attr( $value ); ?>' 
 			   class="regular-text"
@@ -130,21 +226,44 @@ final class SudoWP_Geo_Redirect {
 	 * Admin Options Page HTML
 	 */
 	public function options_page_html(): void {
+		// Security: Check user permissions
 		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
+			wp_die(
+				esc_html__( 'You do not have sufficient permissions to access this page.', 'sudowp-geo-redirect' ),
+				esc_html__( 'Permission Denied', 'sudowp-geo-redirect' ),
+				array( 'response' => 403 )
+			);
+		}
+
+		// Security: Check if settings were updated
+		if ( isset( $_GET['settings-updated'] ) ) {
+			add_settings_error(
+				self::OPTION_KEY,
+				'settings_updated',
+				__( 'Settings saved successfully.', 'sudowp-geo-redirect' ),
+				'success'
+			);
 		}
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 			
+			<?php settings_errors( self::OPTION_KEY ); ?>
+			
 			<div class="notice notice-info inline">
 				<p>
-					<strong>Getting Started:</strong> 
-					Create your redirects at <a href="https://geolify.com" target="_blank" rel="noopener noreferrer">Geolify.com</a> and paste the IDs below.
+					<strong><?php esc_html_e( 'Getting Started:', 'sudowp-geo-redirect' ); ?></strong> 
+					<?php
+					printf(
+						/* translators: %s: URL to Geolify.com */
+						esc_html__( 'Create your redirects at %s and paste the IDs below.', 'sudowp-geo-redirect' ),
+						'<a href="' . esc_url( 'https://geolify.com' ) . '" target="_blank" rel="noopener noreferrer">Geolify.com</a>'
+					);
+					?>
 				</p>
 			</div>
 
-			<form action="options.php" method="post">
+			<form action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>" method="post">
 				<?php
 				settings_fields( 'sudowp_geo_redirect_group' );
 				do_settings_sections( 'sudowp_geo_redirect' );
@@ -159,7 +278,7 @@ final class SudoWP_Geo_Redirect {
 	 * Enqueue Frontend Scripts securely
 	 */
 	public function enqueue_geo_scripts(): void {
-		$options = get_option( self::OPTION_KEY );
+		$options = get_option( self::OPTION_KEY, array() );
 		
 		if ( ! $options || ! is_array( $options ) ) {
 			return;
@@ -169,14 +288,23 @@ final class SudoWP_Geo_Redirect {
 		if ( ! empty( $options['ids'] ) ) {
 			$ids = explode( ',', preg_replace( '/\s+/', '', $options['ids'] ) );
 			foreach ( array_filter( $ids ) as $id ) {
-				if ( ! is_numeric( $id ) ) continue; // Security check: Ensure ID is numeric
+				// Security: Strict validation - only positive integers
+				if ( ! ctype_digit( $id ) || (int) $id <= 0 ) {
+					continue;
+				}
+				
+				// Security: Sanitize ID for use in URL
+				$safe_id = absint( $id );
 				
 				wp_enqueue_script(
-					'sudowp-geo-' . $id,
-					'https://www.geolify.com/georedirect.php?id=' . $id,
+					'sudowp-geo-' . $safe_id,
+					esc_url( 'https://www.geolify.com/georedirect.php?id=' . $safe_id ),
 					array(),
 					null,
-					false
+					array(
+						'in_footer' => false,
+						'strategy'  => 'defer',
+					)
 				);
 			}
 		}
@@ -187,27 +315,42 @@ final class SudoWP_Geo_Redirect {
 			
 			// Secure Referrer Handling
 			$referer = '';
-			if ( isset( $_SERVER['HTTP_REFERER'] ) ) {
-				$referer = esc_url_raw( $_SERVER['HTTP_REFERER'] );
+			if ( isset( $_SERVER['HTTP_REFERER'] ) && is_string( $_SERVER['HTTP_REFERER'] ) ) {
+				// Security: Validate and sanitize referrer
+				$referer = filter_var( $_SERVER['HTTP_REFERER'], FILTER_VALIDATE_URL );
+				if ( false !== $referer ) {
+					$referer = esc_url_raw( $referer );
+				} else {
+					$referer = '';
+				}
 			}
 
 			foreach ( array_filter( $ids_v2 ) as $id ) {
-				if ( ! is_numeric( $id ) ) continue; // Security check
+				// Security: Strict validation - only positive integers
+				if ( ! ctype_digit( $id ) || (int) $id <= 0 ) {
+					continue;
+				}
+
+				// Security: Sanitize ID for use in URL
+				$safe_id = absint( $id );
 
 				$script_url = add_query_arg(
 					array(
-						'refurl' => urlencode( $referer ), // Encode for safety
-						'id'     => $id,
+						'refurl' => rawurlencode( $referer ), // Use rawurlencode for URL parameters
+						'id'     => $safe_id,
 					),
 					'https://www.geolify.com/georedirectv2.php'
 				);
 
 				wp_enqueue_script(
-					'sudowp-geo-v2-' . $id,
-					$script_url,
+					'sudowp-geo-v2-' . $safe_id,
+					esc_url( $script_url ),
 					array(),
 					null,
-					false
+					array(
+						'in_footer' => false,
+						'strategy'  => 'defer',
+					)
 				);
 			}
 		}
