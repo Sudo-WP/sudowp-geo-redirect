@@ -161,9 +161,6 @@ final class SudoWP_Geo_Redirect {
 		// First sanitize the text
 		$id_list = sanitize_text_field( $id_list );
 		
-		// Remove all whitespace
-		$id_list = preg_replace( '/\s+/', '', $id_list );
-		
 		if ( empty( $id_list ) ) {
 			return '';
 		}
@@ -329,9 +326,9 @@ final class SudoWP_Geo_Redirect {
 			$ids_v2 = explode( ',', preg_replace( '/\s+/', '', $options['v2_ids'] ) );
 			
 			// Secure Referrer Handling
-			// Security: Use filter_input for safer superglobal access
-			$referer = filter_input( INPUT_SERVER, 'HTTP_REFERER', FILTER_VALIDATE_URL );
-			if ( false === $referer || null === $referer ) {
+			// Security: Validate and sanitize referrer with fallback for FastCGI/PHP-FPM
+			$referer = filter_var( $_SERVER['HTTP_REFERER'] ?? '', FILTER_VALIDATE_URL );
+			if ( false === $referer || empty( $referer ) ) {
 				$referer = '';
 			} else {
 				// Additional sanitization for WordPress
