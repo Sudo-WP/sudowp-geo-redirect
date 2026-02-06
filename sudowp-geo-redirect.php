@@ -3,7 +3,7 @@
  * Plugin Name: SudoWP Geo Redirect
  * Plugin URI:  https://sudowp.com
  * Description: A secure, modernized geo-redirection tool based on Geolify. Features PHP 8.2 strict typing and security hardening.
- * Version:     2.1.0
+ * Version:     2.1.1
  * Author:      SudoWP
  * Author URI:  https://sudowp.com
  * Text Domain: sudowp-geo-redirect
