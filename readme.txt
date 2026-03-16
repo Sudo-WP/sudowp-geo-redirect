@@ -4,7 +4,7 @@ Original Authors: Geolify
 Tags: geo redirect, geolify, security-fork, patched, php8.2
 Requires at least: 5.8
 Tested up to: 6.7
-Stable tag: 2.1.1
+Stable tag: 2.1.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,12 @@ Yes, it functions as a drop-in replacement but with a cleaner codebase. You shou
 Yes. This plugin is the WordPress integration connector. The redirection logic (IDs) is still managed via the Geolify dashboard.
 
 == Changelog ==
+
+= 2.1.2 (Security Audit) =
+* Security Fix: wp_unslash applied on HTTP_REFERER for proper input handling.
+* Security Fix: ctype_digit validation for ID fields to prevent type juggling.
+* Improvement: Added Requires PHP header to plugin metadata.
+* Cleanup: Added uninstall.php for proper data removal on plugin deletion.
 
 = 2.1.1 (Security Hardening Update) =
 * Security Enhancement: Added capability checks in sanitize_settings callback.
