@@ -8,6 +8,7 @@
  * Author URI:  https://sudowp.com
  * Text Domain: sudowp-geo-redirect
  * License:     GPLv2 or later
+ * Requires PHP: 8.0
  */
 
 declare(strict_types=1);
@@ -160,7 +161,7 @@ final class SudoWP_Geo_Redirect {
 	private function sanitize_id_list( string $id_list, string $field_key ): string {
 		// First sanitize the text
 		$id_list = sanitize_text_field( $id_list );
-		
+
 		if ( empty( $id_list ) ) {
 			return '';
 		}
@@ -209,10 +210,10 @@ final class SudoWP_Geo_Redirect {
 		$value   = isset( $options[ $args['key'] ] ) ? $options[ $args['key'] ] : '';
 		$field_id = $args['label_for'] ?? '';
 		?>
-		<input type='text' 
+		<input type='text'
 			   id='<?php echo esc_attr( $field_id ); ?>'
-			   name='<?php echo esc_attr( self::OPTION_KEY . '[' . $args['key'] . ']' ); ?>' 
-			   value='<?php echo esc_attr( $value ); ?>' 
+			   name='<?php echo esc_attr( self::OPTION_KEY . '[' . $args['key'] . ']' ); ?>'
+			   value='<?php echo esc_attr( $value ); ?>'
 			   class="regular-text"
 			   placeholder="e.g. 1234, 5678">
 		<p class="description"><?php esc_html_e( 'Enter the IDs provided by Geolify, separated by commas.', 'sudowp-geo-redirect' ); ?></p>
@@ -245,12 +246,12 @@ final class SudoWP_Geo_Redirect {
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
-			
+
 			<?php settings_errors( self::OPTION_KEY ); ?>
-			
+
 			<div class="notice notice-info inline">
 				<p>
-					<strong><?php esc_html_e( 'Getting Started:', 'sudowp-geo-redirect' ); ?></strong> 
+					<strong><?php esc_html_e( 'Getting Started:', 'sudowp-geo-redirect' ); ?></strong>
 					<?php
 					echo wp_kses(
 						sprintf(
@@ -286,7 +287,7 @@ final class SudoWP_Geo_Redirect {
 	 */
 	public function enqueue_geo_scripts(): void {
 		$options = get_option( self::OPTION_KEY, array() );
-		
+
 		if ( ! $options || ! is_array( $options ) ) {
 			return;
 		}
@@ -296,20 +297,20 @@ final class SudoWP_Geo_Redirect {
 			$ids = explode( ',', $options['ids'] );
 			foreach ( array_filter( $ids ) as $id ) {
 				$id = trim( $id );
-				
+
 				// Security: Strict validation - only positive integers
 				if ( ! ctype_digit( $id ) || (int) $id <= 0 ) {
 					continue;
 				}
-				
+
 				// Security: Sanitize ID for use in URL
 				$safe_id = absint( $id );
-				
+
 				$script_url = add_query_arg(
 					array( 'id' => $safe_id ),
 					'https://www.geolify.com/georedirect.php'
 				);
-				
+
 				wp_enqueue_script(
 					'sudowp-geo-' . $safe_id,
 					esc_url( $script_url ),
@@ -326,13 +327,13 @@ final class SudoWP_Geo_Redirect {
 		// Handle V2 IDs
 		if ( ! empty( $options['v2_ids'] ) ) {
 			$ids_v2 = explode( ',', $options['v2_ids'] );
-			
+
 			// Secure Referrer Handling
 			// Security: Use filter_input for safer access, with fallback for FastCGI/PHP-FPM
 			$referer = filter_input( INPUT_SERVER, 'HTTP_REFERER', FILTER_VALIDATE_URL );
 			if ( false === $referer || null === $referer ) {
 				// Fallback for FastCGI/PHP-FPM environments where filter_input may not work
-				$referer = filter_var( $_SERVER['HTTP_REFERER'] ?? '', FILTER_VALIDATE_URL );
+				$referer = filter_var( wp_unslash( $_SERVER['HTTP_REFERER'] ?? '' ), FILTER_VALIDATE_URL );
 				if ( false === $referer ) {
 					$referer = '';
 				}
@@ -342,7 +343,7 @@ final class SudoWP_Geo_Redirect {
 
 			foreach ( array_filter( $ids_v2 ) as $id ) {
 				$id = trim( $id );
-				
+
 				// Security: Strict validation - only positive integers
 				if ( ! ctype_digit( $id ) || (int) $id <= 0 ) {
 					continue;
